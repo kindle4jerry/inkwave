@@ -14,6 +14,10 @@ export class Input {
     this.mouse = { dx: 0, dy: 0, left: false, right: false, leftPressed: false, rightPressed: false };
     this.locked = false;
     this.enabled = true;
+    this.wantLock = false;          // the game asked for the mouse and hasn't been given it (see requestLock)
+    this.lockError = false;         // …and the last request was refused (no user gesture / document not active / blocked)
+    this.lockTries = 0;             // requests made for the current round (a retry after a click means the browser said no)
+    this.relockAllowed = null;      // () => bool, set by main.js: is a live round on screen that wants the pointer?
     this.pad = null;
     this.padPrev = [];
     this.padPressed = new Set();
@@ -52,21 +56,50 @@ export class Input {
       if (e.button === 2) this.mouse.right = false;
     });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
+    document.addEventListener('pointerlockerror', () => { if (!this.locked) this.lockError = true; });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
+      if (this.locked) { this.lockError = false; this.lockTries = 0; }
       if (!this.locked) { this.mouse.left = this.mouse.right = false; this.onUnlock?.(); }
     });
+    // Pointer lock needs transient activation plus an active document, so a round that starts from a *network*
+    // message — an online guest's "go" over the relay — cannot take the mouse on its own. The player's next click or
+    // key press is the gesture that does it (the HUD asks for exactly that while the mouse is not captured), and the
+    // same path covers a lock that was refused because the window was in the background. Gated by relockAllowed so
+    // nothing grabs the pointer while a menu is up.
+    const grab = () => {
+      if (!this.wantLock || this.locked) return;
+      if (this.relockAllowed && !this.relockAllowed()) return;
+      this.requestLock();
+    };
+    window.addEventListener('pointerdown', grab, true);
+    window.addEventListener('keydown', grab, true);
   }
 
+  // Ask for the pointer. Chrome only grants this with transient user activation (and an active document), which the
+  // caller cannot know: a refusal leaves wantLock set, so the next click or key press retries (see the grab listener)
+  // and the HUD can tell the player to click.
   requestLock() {
+    this.wantLock = true;
     if (this.locked) return;
+    this.lockTries++;
     try {
       const p = this.canvas.requestPointerLock({ unadjustedMovement: true });
-      // some platforms reject unadjustedMovement: fall back to a plain request
-      if (p && p.catch) p.catch(() => { try { const q = this.canvas.requestPointerLock(); if (q && q.catch) q.catch(() => {}); } catch { /* ignore */ } });
-    } catch { /* not allowed without a gesture */ }
+      if (p && p.catch) p.catch((e) => {
+        // a platform that has no raw-input option rejects the option itself — retry plainly; a refusal because the
+        // document has no user activation is left to the next click or key press (the grab listener above)
+        if (e && (e.name === 'TypeError' || e.name === 'NotSupportedError')) this._plainLock();
+        else this.lockError = true;
+      });
+    } catch { this.lockError = true; }
   }
-  exitLock() { if (document.pointerLockElement) document.exitPointerLock(); }
+  _plainLock() {
+    try {
+      const q = this.canvas.requestPointerLock();
+      if (q && q.catch) q.catch(() => { this.lockError = true; });
+    } catch { this.lockError = true; }
+  }
+  exitLock() { this.wantLock = false; this.lockTries = 0; this.lockError = false; if (document.pointerLockElement) document.exitPointerLock(); }
 
   down(code) { return this.keys.has(code); }
   wasPressed(code) { return this.pressed.has(code); }

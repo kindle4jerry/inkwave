@@ -92,6 +92,17 @@ the room; a sweep drops sockets silent for 20 s during a match (150 s in the lob
 Durable Object per code and hibernates when quiet; `tools/relay.mjs` keeps rooms in memory (they end when the relay
 does) and needs no account, no internet and no dependencies, which is what makes LAN play work offline.
 
+**Mouse capture.** Every shot comes from `input.mouse`, and `input.js` ignores the mouse entirely while the pointer is
+not locked — so a player who never gets pointer lock can walk but cannot aim or fire. A browser grants
+`requestPointerLock()` only with transient user activation and a focused document, and an online round starts on the
+relay's `go` message rather than on a click: the guest's request at match start is refused (the host gets no special
+treatment either, they have simply clicked more recently, which is why offline — where the lock follows the START
+click — this never shows up). So `main.js` says *Click to take the mouse (or press any key)* while
+`input.wantLock && !input.locked`, and `input.js` retries the lock on the next click or key press
+(`input.relockAllowed` keeps menus and the attract loop from grabbing the pointer). Chrome 131+ also gates pointer lock
+behind a per-site permission on plain `http://` addresses: if the retry is refused too, the prompt says so and it has
+to be allowed once per machine.
+
 **Testing.** `npm run lan-test` (no browser, no internet) checks the relay protocol — create / join / refusals / host
 election / fan-out / lock / ping / liveness sweep / rate and size caps — the game's own address picking and a real
 room handshake through `Transport`, and `tools/serve.mjs` serving the game and the relay on one port.

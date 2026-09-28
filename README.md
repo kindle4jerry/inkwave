@@ -91,6 +91,12 @@ that port, or use `?relay=ws://<address>:8787` with a relay started separately b
 **LAN RELAY** row shows which address a screen is talking to and lets you type another one (no internet is ever
 required for LAN play — if a room can't be reached, that row is the first thing to check).
 
+**Can walk but can't aim or shoot?** A browser only hands the game the mouse (`pointer lock`) after the player
+themselves clicks or presses a key, and an online round starts from a network message — so when the HUD says
+*Click to take the mouse*, that one click (or any key) is all it takes. On Chrome 131+ a plain `http://` address may
+also ask permission for pointer lock the first time; allow it once per machine. The machine serving the page never
+sees this because `localhost` is trusted and its clicks come first.
+
 To play online on the public internet, deploy the relay next to the game:
 
 ```bash

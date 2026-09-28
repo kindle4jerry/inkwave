@@ -80,6 +80,10 @@ class Game {
     this.input = G.input = new Input(this.R.renderer.domElement);
     this.input.onKey = (e, repeat) => this._onKey(e, repeat);
     this.input.onUnlock = () => this._onPointerUnlock();
+    // a live round wants the pointer; menus, the pause screen and the attract loop do not (input.js retries the lock
+    // on the player's next click or key press, which is the only thing a browser accepts as a gesture — an online
+    // guest's round starts on a network message, so its first lock request has no gesture behind it)
+    this.input.relockAllowed = () => G.mode === 'match' && !!this.match && !this.match.attract && !this.match.paused && !this.menus?.current && !params.has('autopilot');
     // after a focus steal while the map was held, the next click on the game takes the mouse back (no pause detour)
     this.R.renderer.domElement.addEventListener('mousedown', () => {
       if (this._relock && G.mode === 'match' && this.match && !this.match.paused && !this.menus?.current) { this._relock = false; this.input.requestLock(); }
@@ -1098,7 +1102,15 @@ class Game {
     this._hintT += dt;
     let prompt = null;
     const inkF = a.ink / PLAYER.inkMax;
-    if (m.state === 'playing' && a.alive) {
+    // the mouse is not captured (an online round starts on the relay's "go", and a browser only grants pointer lock to
+    // a user gesture): say so instead of leaving the player unable to aim or fire — input.js then takes the lock on
+    // the click (or key press) this prompt asks for. If even that was refused, the browser is blocking it for this
+    // site (Chrome 131+ gates pointer lock behind a permission on plain http addresses).
+    if (this.input.wantLock && !this.input.locked && !params.has('autopilot') && m.state !== 'finish') {
+      prompt = this.input.lockTries > 1 && this.input.lockError
+        ? 'Mouse capture is blocked — allow pointer lock for this site, then click again'
+        : 'Click to take the mouse (or press any key)';
+    } else if (m.state === 'playing' && a.alive) {
       if (m.controller?.mapHeld) prompt = null;   // the map diorama carries its own super-jump hints
       else if (a.superJumpState) prompt = null;
       else if (this._lowInkFlash > 0) { this._lowInkFlash -= dt; prompt = 'Low ink! Hold SHIFT in your ink to refill'; }
