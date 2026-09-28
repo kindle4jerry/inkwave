@@ -19,6 +19,7 @@ import {
 } from '../config.js';
 import * as LOOK from '../game/character-style.js';
 import { G } from '../core/ctx.js';
+import { relayCandidates, relayOverride, setRelayOverride } from '../net/transport.js';
 import {
   computeAwards, medalMarkup, awardBadge, awardIcon, rankEmblem, rankTier, RANK_TIERS, inkBurst, InkWipe, createPreview,
   sweepEdge, sweepClip, splatClip, splatCover, skinSwatch, irisSwatch, outfitIcon, tagArt, inkBand, dripsSVG, computeBossAwards,
@@ -49,7 +50,7 @@ const JOIN_ERR = {
   'Room not found': { title: 'ROOM NOT FOUND', text: 'No room uses that code. Double-check it with your friend — rooms close when everyone leaves.', icon: 'question' },
   'Room is full': { title: 'ROOM IS FULL', text: 'All 8 spots are taken. Ask the host to make space, or open a room of your own.', icon: 'users' },
   'Match in progress': { title: 'MATCH IN PROGRESS', text: 'They are mid-match right now. Try again in a few minutes — the room reopens after the results.', icon: 'clock' },
-  'Could not connect': { title: 'CAN\u2019T CONNECT', text: 'The INKWAVE servers didn\u2019t answer. Check your connection, then try again.', icon: 'signal' },
+  'Could not connect': { title: 'CAN\u2019T CONNECT', text: 'No relay answered. Playing on a LAN? The host runs the relay (npm start) and everyone opens the page from the host\u2019s address — the LAN RELAY row below shows what this screen is trying.', icon: 'signal' },
   'Room code taken': { title: 'TRY AGAIN', text: 'That room code was just taken. Give it another go.', icon: 'reset' },
   'Lost connection to the room': { title: 'CONNECTION LOST', text: 'The link to the room dropped. Check your connection and join again.', icon: 'signal' },
 };
@@ -1369,6 +1370,57 @@ export class Menus {
     };
   }
 
+  /** The LAN relay sticker on the ONLINE hub: the address rooms go through, and a way to point it somewhere else.
+   *  Empty / "auto" → the game works the address out from the page's own URL (src/net/transport.js). */
+  _relayRow() {
+    const val = h('b', { class: 'iw-hub__relayval' });
+    const input = h('input', { class: 'iw-hub__relayinput', type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: 'auto', maxlength: '64' });
+    const row = h('div', { class: 'iw-hub__relay iw-in' },
+      h('i', { class: 'iw-hub__relayicon', html: GLYPHS.signal }),
+      h('span', { class: 'iw-hub__relaylbl' }, 'LAN RELAY'),
+      h('span', { class: 'iw-hub__relaybox' }, val, input),
+      h('span', { class: 'iw-hub__relaybtn' }, 'CHANGE'));
+    const refresh = () => {
+      const net = this._net();
+      const live = (net && net.relay) || '';
+      const url = String(live || relayCandidates()[0] || '').replace(/^wss?:\/\//, '').replace(/\/+$/, '');
+      val.textContent = url || 'none';
+      row.classList.toggle('is-live', !!live);
+      row.classList.toggle('is-manual', !!relayOverride());
+    };
+    const commit = () => {
+      row.classList.remove('is-editing');
+      if (input.dataset.cancel) { delete input.dataset.cancel; input.value = input.dataset.orig || ''; this._sfx('ui_back'); return; }
+      const was = relayOverride();
+      const now = setRelayOverride(input.value);
+      input.value = now.replace(/^wss?:\/\//, '');
+      if (now === was) { this._sfx('ui_back'); return; }
+      refresh();
+      this._sfx('ui_confirm');
+      this.toast(now ? `Relay set to ${now.replace(/^wss?:\/\//, '')} — it applies to your next room` : 'Relay address back to automatic', { kind: 'good', icon: GLYPHS.check });
+    };
+    const edit = () => {
+      this._sfx('ui_click');
+      input.value = relayOverride().replace(/^wss?:\/\//, '');
+      input.dataset.orig = input.value;
+      row.classList.add('is-editing');
+      input.focus();
+    };
+    input.addEventListener('blur', commit);
+    input.addEventListener('focus', () => { row.classList.add('is-editing'); input.dataset.orig = input.value; setTimeout(() => input.select(), 0); });
+    input.addEventListener('keydown', (e) => {
+      // commit/cancel here too, so it works even if the engine forwards keys late (as the name field does)
+      if (e.key === 'Enter' || e.key === 'NumpadEnter') { e.preventDefault(); e.stopPropagation(); input.blur(); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); input.dataset.cancel = '1'; input.blur(); }
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); input.blur(); this.setInputMode('kbm'); this._nav(e.key === 'ArrowUp' ? 'up' : 'down'); }
+      else e.stopPropagation();
+    });
+    this._bind(row, { id: 'relay', accept: edit });
+    row._refresh = refresh;
+    refresh();
+    return row;
+  }
+
   /** Squidkid name field (Enter/click to edit, Esc cancels, blank names are refused). */
   _nameRow() {
     const prof = this._profile();
@@ -2267,7 +2319,7 @@ export class Menus {
       [['1', 'Create or join', GLYPHS.flag], ['2', 'Share the code', GLYPHS.copy], ['3', 'Ready up & ink!', GLYPHS.check]].map(([n, t, ic], i) =>
         h('div', { class: 'iw-hubstep', style: { '--tilt': `${[-2, 1.5, -1][i]}deg` } }, h('b', { html: splatSVG({ seed: 30 + i * 7, cls: 'iw-fa', r: 56, arms: 8, drops: 2 }) }, h('span', null, n)), h('i', { html: ic }), h('span', null, t))));
 
-    const body = h('div', { class: 'iw-hub__body' }, create, join, steps);
+    const body = h('div', { class: 'iw-hub__body' }, create, join, steps, this._relayRow());
 
     // ---- you: your splashtag (the name on it is editable) + weapon + look (the kid stands on the pedestal to the right)
     const nameRow = this._nameRow();

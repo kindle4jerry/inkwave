@@ -1806,6 +1806,24 @@ circle.iw-ico-cut { fill: var(--cut, #fff); }
 .iw-hubstep > i svg { width: 100%; height: 100%; }
 .iw-hubstep:not(:last-child)::after { content: ''; position: absolute; right: calc(var(--u) * -1.45); top: 50%; width: 0; height: 0; margin-top: calc(var(--u) * -.6);
   border-left: calc(var(--u) * .9) solid var(--hv); border-top: calc(var(--u) * .6) solid transparent; border-bottom: calc(var(--u) * .6) solid transparent; filter: drop-shadow(2px 0 0 var(--k)) drop-shadow(0 2px 0 var(--k)); }
+/* LAN relay sticker: which address rooms go through (auto from the page's own URL, or typed by hand) */
+.iw-hub__relay { display: flex; align-items: center; gap: .55em; align-self: flex-start; max-width: 100%; margin: 0 calc(var(--u) * .4); padding: .5em .9em; border-radius: 999px;
+  background: #fff; color: var(--k); font: 700 var(--fs-xs) / 1.15 'Rubik', sans-serif; rotate: -.7deg; box-shadow: var(--stk-k); pointer-events: auto; }
+.iw-hub__relay > i { flex: none; display: block; width: 1.35em; height: 1.35em; color: var(--k); }
+.iw-hub__relay > i svg { width: 100%; height: 100%; }
+.iw-hub__relaylbl { flex: none; font-size: .85em; letter-spacing: .09em; opacity: .55; }
+.iw-hub__relaybox { display: flex; align-items: center; min-width: 0; }
+.iw-hub__relayval { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-weight: 600; }
+.iw-hub__relayval::after { content: 'auto'; margin-left: .5em; padding: .15em .5em; border-radius: 999px; background: var(--k); color: #fff; font: 700 .82em / 1.4 'Rubik', sans-serif; letter-spacing: .08em; }
+.iw-hub__relay.is-manual .iw-hub__relayval::after { content: 'manual'; background: var(--hv); color: var(--k); }
+.iw-hub__relay.is-live .iw-hub__relayval::after { content: 'live'; background: #2fbf6a; color: #fff; }
+.iw-hub__relayinput { display: none; width: 15em; max-width: 46vw; padding: .12em .45em; border: 0; border-bottom: 2px solid var(--k); background: transparent; color: var(--k);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-weight: 600; font-size: 1em; outline: none; }
+.iw-hub__relay.is-editing .iw-hub__relayval { display: none; }
+.iw-hub__relay.is-editing .iw-hub__relayinput { display: block; }
+.iw-hub__relaybtn { flex: none; margin-left: .2em; padding: .25em .6em; border-radius: 999px; background: var(--k); color: #fff; font-size: .85em; letter-spacing: .06em; }
+.iw-hub__relay.is-editing .iw-hub__relaybtn { display: none; }
+.iw-hub__relay:not(.is-editing):hover .iw-hub__relaybtn { background: var(--hv); color: var(--k); }
 /* you (right): splashtag with your editable name, then weapon + look tickets under the kid */
 .iw-hub__me { position: absolute; inset: 0; pointer-events: none; }
 .iw-hub__metag { position: absolute; right: calc(var(--u) * 3.6 + var(--sar)); top: calc(var(--u) * 2.6 + var(--sat)); width: min(calc(var(--u) * 30), 34vw); display: flex; flex-direction: column; align-items: flex-end; gap: calc(var(--u) * .5); pointer-events: auto; }

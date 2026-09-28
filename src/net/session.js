@@ -21,6 +21,7 @@ export class NetSession {
     this.code = null;
     this.myId = null;
     this.hostId = null;
+    this.relay = null;          // the relay address this session is speaking to (transport.js picks it: LAN, same origin, public)
     this.error = null;
     this.lobby = this._blankLobby();
     this._subs = new Map();
@@ -86,12 +87,14 @@ export class NetSession {
     this.error = null;
     this._setState('connecting');
     const tr = (this.tr = new Transport());
+    this.relay = null;
     tr.onControl = (o) => this._control(o);
     tr.onMessage = (from, d) => this._message(from, d);
     tr.onClose = (reason) => this._closed(reason);
     const me = this._profile();
     const welcome = await tr.connect(code, name || me.name, create);
     this.code = code;
+    this.relay = tr.url || null;
     this.myId = welcome.id;
     this.hostId = welcome.host;
     this._members.clear();
@@ -112,7 +115,7 @@ export class NetSession {
     this.match?.dispose(); this.match = null;
     this.tr?.close(); this.tr = null;
     const was = this.state;
-    this.code = null; this.myId = null; this.hostId = null;
+    this.code = null; this.myId = null; this.hostId = null; this.relay = null;
     this._members.clear();
     this.lobby = this._blankLobby();
     this._startCfg = null;
@@ -122,6 +125,7 @@ export class NetSession {
 
   _fail(e) {
     this.error = e?.message || 'Could not connect';
+    this.relay = null;
     this.tr?.close(); this.tr = null;
     this._setState('error');
     this._emit('error', { message: this.error });
@@ -133,6 +137,7 @@ export class NetSession {
     this.match?.dispose(); this.match = null;
     this.tr = null;
     this.code = null;
+    this.relay = null;
     this._setState(this.error ? 'error' : 'offline');
     if (this.error) this._emit('error', { message: this.error });
     if (inMatch) G.game?.netMatchAborted?.(this.error);

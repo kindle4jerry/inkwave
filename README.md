@@ -66,36 +66,63 @@ From the main menu choose **Online**, then **Create a room** and send your frien
 type theirs). The host picks the stage, time of day, match length and whether bots fill empty slots; everyone else
 picks a team, weapon and look and readies up. The lineup, emotes and ready state are live for everyone in the room.
 
-Rooms run on a tiny relay (a Cloudflare Worker with one Durable Object per room, in [`server/`](server)). It only
-forwards messages: every player simulates their own squidkid and streams it, and everyone else draws it through the
-same animation system on a smoothed timeline about a tenth of a second behind. How that works, and the tools used to
+Rooms run on a tiny relay: one process that tracks membership, elects the host and forwards messages. It only
+forwards: every player simulates their own squidkid and streams it, and everyone else draws it through the same
+animation system on a smoothed timeline about a tenth of a second behind. How that works, and the tools used to
 measure it, are in [`docs/NET.md`](docs/NET.md).
 
-To play online on your own network, run the relay next to the game:
+### Playing on a LAN (no internet needed)
+
+The public site uses the deployed Cloudflare relay, but the relay is also just a small Node process in
+[`tools/relay.mjs`](tools/relay.mjs) — no dependencies, no account, no outbound connection. On one machine
+(the host) run:
 
 ```bash
-npm install      # once: the relay runs on wrangler
-npm run relay    # ws://<this machine>:8787
+npm start                 # serves the game *and* the relay on http://<this machine>:8490
 ```
 
-A page opened from `localhost` or a LAN address uses that relay automatically; `?relay=wss://…` points it anywhere else.
+Everyone else opens `http://<the host's address>:8490` — the address printed by the server, over a real network or a
+virtual one (Tailscale, ZeroTier, Radmin, Hamachi all work; so do `.local` names and IPv6). Because the game and the
+relay are on the same address, there is nothing to configure: create a room, share the five-character code, play.
+Test it without a browser with `npm run lan-test`.
+
+If your friends really can't reach the page, allow `node.exe` through the Windows firewall (private networks) for
+that port, or use `?relay=ws://<address>:8787` with a relay started separately by `npm run relay`. The online screen's
+**LAN RELAY** row shows which address a screen is talking to and lets you type another one (no internet is ever
+required for LAN play — if a room can't be reached, that row is the first thing to check).
+
+To play online on the public internet, deploy the relay next to the game:
+
+```bash
+npm install      # once: the Worker relay runs on wrangler
+npm run relay:worker   # local Worker relay on :8787, or: npm run deploy-relay
+```
+
+A page opened from `localhost` or a LAN address uses a local relay automatically; `?relay=wss://…` points it anywhere
+else.
 
 ## Running locally
 
-There is no build step. Any static file server works; the included one also serves to your LAN and sends no-cache headers so module updates are never stale.
+There is no build step. Any static file server works; the included one (`tools/serve.mjs`, Node, no dependencies) also
+serves the relay on the same port and sends no-cache headers so module updates are never stale.
 
 ```bash
 git clone https://github.com/jaydendavisnc/inkwave.git
 cd inkwave
-npm start        # http://localhost:8490
+npm start        # http://localhost:8490 (+ your LAN addresses)
 ```
 
-Useful URL parameters: `?map=halyard&time=dusk` picks a stage, `&autostart=180` skips the menus into a 180 s match, `&autopilot` lets a bot drive you.
+`npm start` needs nothing but Node. `npm run start:py` runs the equivalent Python server (`tools/serve.py`) if you
+prefer it — that one serves only files, so run `npm run relay` next to it for rooms.
+
+Useful URL parameters: `?map=halyard&time=dusk` picks a stage, `&autostart=180` skips the menus into a 180 s match,
+`&autopilot` lets a bot drive you, `?relay=ws://host:8787` picks a relay.
 
 ```bash
 npm install      # once, for the headless tools
 npm run check    # syntax-check every module
 npm run smoke    # boot + 8 s of autopilot in headless Chrome, fails on console errors
+npm run lan-test # LAN rooms end to end: relay protocol, address picking, one-port server (no browser needed)
 npm run build    # assemble dist/ (game + only the three.js addons it imports)
 ```
 

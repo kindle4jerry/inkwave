@@ -8,7 +8,8 @@ Thanks for your interest! INKWAVE is a plain ES-module three.js project with no 
 git clone https://github.com/jaydendavisnc/inkwave.git
 cd inkwave
 npm install          # only needed for the headless tools (puppeteer-core)
-npm start            # serves http://localhost:8490 (and your LAN address)
+npm start            # serves http://localhost:8490 and your LAN addresses (game + relay, Node only)
+npm run lan-test     # optional: LAN rooms end to end, no browser needed
 ```
 
 Open the URL in Chrome, Edge or Firefox. Everything reloads on refresh; there is no bundler.
